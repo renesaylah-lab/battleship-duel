@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚓ Battleship Duel</title>
+  <meta name="description" content="A two-player peer-to-peer Battleship game. Create a game, share the link, and play from anywhere." />
+  <link rel="stylesheet" href="css/styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9A%93%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+  <div class="sea-bg"><span></span><span></span><span></span></div>
+
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">⚓ <span>Battleship</span> Duel</div>
+      <div class="topbar-right">
+        <span id="conn-pill" class="pill pill-off">offline</span>
+        <button id="mute-btn" class="icon-btn" title="Toggle sound" aria-label="Toggle sound">🔊</button>
+      </div>
+    </header>
+
+    <main>
+      <!-- HOME -->
+      <section id="screen-home" class="screen">
+        <div class="hero">
+          <h1 class="title">Battleship <span>Duel</span></h1>
+          <p class="subtitle">Two captains. Two oceans. One survivor. Play from anywhere — no account, no server.</p>
+        </div>
+
+        <div class="name-row">
+          <label for="name-input">Captain name</label>
+          <input id="name-input" type="text" maxlength="16" placeholder="e.g. Anna" autocomplete="off" />
+        </div>
+
+        <div class="card-grid">
+          <div class="card">
+            <h2>🚩 Create a game</h2>
+            <p>Start a new battle and get a shareable link &amp; code to send your opponent.</p>
+            <button id="create-btn" class="btn btn-primary">Create game</button>
+          </div>
+          <div class="card">
+            <h2>🔗 Join a game</h2>
+            <p>Got a code from a friend? Drop it in and set sail.</p>
+            <input id="join-code" type="text" maxlength="5" placeholder="CODE" class="code-input" autocomplete="off" />
+            <button id="join-btn" class="btn">Join game</button>
+          </div>
+        </div>
+        <p id="home-hint" class="hint"></p>
+      </section>
+
+      <!-- LOBBY -->
+      <section id="screen-lobby" class="screen hidden">
+        <div class="lobby">
+          <h2 id="lobby-title">Waiting for your opponent…</h2>
+          <div id="lobby-host">
+            <p class="muted">Share this code or link with your opponent:</p>
+            <div class="code-display" id="code-display">-----</div>
+            <div class="lobby-actions">
+              <button id="copy-code" class="btn">Copy code</button>
+              <button id="copy-link" class="btn btn-primary">Copy invite link</button>
+            </div>
+          </div>
+          <div class="spinner"></div>
+          <p id="lobby-status" class="muted">Keep this tab open — the game starts the moment they join.</p>
+          <button id="lobby-cancel" class="btn btn-ghost">Cancel</button>
+        </div>
+      </section>
+
+      <!-- PLACEMENT -->
+      <section id="screen-place" class="screen hidden">
+        <div class="phase-head">
+          <h2 id="place-heading">Deploy your fleet</h2>
+          <p id="place-opp-status" class="muted">Opponent is deploying…</p>
+        </div>
+        <div class="place-layout">
+          <div class="board-wrap">
+            <div id="place-board" class="grid"></div>
+          </div>
+          <div class="dock">
+            <h3>Your fleet</h3>
+            <ul id="ship-dock" class="ship-dock"></ul>
+            <div class="dock-actions">
+              <button id="rotate-btn" class="btn">↻ Rotate <kbd>R</kbd></button>
+              <button id="random-btn" class="btn">🎲 Random</button>
+              <button id="clear-btn" class="btn btn-ghost">Clear</button>
+            </div>
+            <p class="tip">Click a cell to place the highlighted ship. Click a placed ship to pick it up again.</p>
+            <button id="ready-btn" class="btn btn-primary btn-big" disabled>Ready for battle</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- BATTLE -->
+      <section id="screen-battle" class="screen hidden">
+        <div id="turn-banner" class="turn-banner">—</div>
+        <div class="battle-layout">
+          <div class="board-col">
+            <h3 class="board-title">🎯 Enemy Waters <small id="enemy-name"></small></h3>
+            <div class="board-wrap">
+              <div id="enemy-board" class="grid"></div>
+            </div>
+            <ul id="enemy-fleet" class="fleet-status"></ul>
+          </div>
+          <div class="board-col">
+            <h3 class="board-title">🛡️ Your Fleet <small id="my-name"></small></h3>
+            <div class="board-wrap">
+              <div id="my-board" class="grid"></div>
+            </div>
+            <ul id="my-fleet" class="fleet-status"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- GAME OVER -->
+      <section id="screen-over" class="screen hidden">
+        <div class="over">
+          <h1 id="over-title">Victory!</h1>
+          <p id="over-text" class="muted"></p>
+          <div class="over-actions">
+            <button id="rematch-btn" class="btn btn-primary btn-big">Rematch</button>
+            <button id="home-btn" class="btn btn-ghost">Back to port</button>
+          </div>
+          <p id="rematch-status" class="muted"></p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span>Peer-to-peer · your fleet never leaves your browser</span>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/net.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

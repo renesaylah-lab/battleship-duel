@@ -127,6 +127,13 @@ kbd { background: rgba(255,255,255,.12); border-radius: 5px; padding: 1px 6px; f
 .ship-name { font-weight: 600; font-size: .95rem; }
 .pips { display: flex; gap: 4px; }
 .pip { width: 12px; height: 12px; border-radius: 3px; background: var(--ship); border: 1px solid var(--ship-edge); }
+
+/* ship silhouette icon (length scales with ship size) */
+.ship-icon { display: inline-flex; align-items: center; gap: 2px; vertical-align: middle; }
+.ship-icon .seg { width: 13px; height: 11px; background: linear-gradient(160deg, var(--ship), #44607c); border: 1px solid var(--ship-edge); border-radius: 2px; }
+.ship-icon .seg.bow { width: 15px; border-radius: 2px 9px 9px 2px; }
+.ship-icon .seg.tower { background: var(--ship-edge); height: 13px; border-radius: 2px; }
+.ship-item.placed .ship-icon .seg { background: linear-gradient(160deg, #4a6b88, #3a5572); }
 .dock-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
 .dock-actions .btn { padding: 10px; font-size: .85rem; }
 .dock-actions #clear-btn { grid-column: span 2; }
@@ -151,6 +158,11 @@ kbd { background: rgba(255,255,255,.12); border-radius: 5px; padding: 1px 6px; f
 .cell.sunk { background: radial-gradient(circle at 50% 45%, #7a1414, #3a0c0c); }
 .cell.sunk::after { content: "✖"; color: #ffb3b3; }
 .cell.firing { animation: firing .6s ease infinite; }
+/* sonar intel — faint hints, not confirmed shots */
+.cell.scan-ship::after { content: ""; position: absolute; inset: 28%; border-radius: 50%; border: 2px solid var(--gold); box-shadow: 0 0 9px rgba(255,216,107,.55); animation: pop .35s ease; }
+.cell.scan-clear::after { content: ""; position: absolute; inset: 42%; border-radius: 50%; background: rgba(56,225,255,.3); }
+#enemy-board.active.aiming-sonar .cell:not(.hit):not(.miss):not(.sunk) { cursor: cell; }
+#enemy-board.aiming-sonar.active .cell:not(.hit):not(.miss):not(.sunk):hover { background: rgba(255,216,107,.28); }
 @keyframes pop { 0% { transform: scale(.4); } 70% { transform: scale(1.18); } 100% { transform: scale(1); } }
 @keyframes firing { 0%,100% { box-shadow: 0 0 0 0 rgba(56,225,255,.6); } 50% { box-shadow: 0 0 0 4px rgba(56,225,255,0); } }
 
@@ -168,8 +180,40 @@ kbd { background: rgba(255,255,255,.12); border-radius: 5px; padding: 1px 6px; f
 .board-title { margin: 0 0 12px; font-size: 1.05rem; }
 .board-title small { color: var(--muted); font-weight: 500; }
 .fleet-status { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; padding: 0; margin: 14px 0 0; max-width: 380px; }
-.fleet-status li { font-size: .76rem; padding: 4px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
-.fleet-status li.sunk { text-decoration: line-through; color: var(--hit); border-color: rgba(255,90,82,.4); background: rgba(255,90,82,.08); }
+.fleet-status li { display: inline-flex; align-items: center; gap: 7px; font-size: .76rem; padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.fleet-status li.sunk { color: var(--hit); border-color: rgba(255,90,82,.4); background: rgba(255,90,82,.08); }
+.fleet-status li.sunk .fleet-name { text-decoration: line-through; }
+.fleet-status li.sunk .ship-icon .seg { background: #5a2020; border-color: #8c3a3a; opacity: .8; }
+.fleet-status .ship-icon .seg { width: 9px; height: 8px; }
+.fleet-status .ship-icon .seg.bow { width: 11px; }
+
+/* battle tools (sonar) */
+.battle-tools { display: flex; justify-content: center; gap: 10px; margin: 0 0 16px; }
+#sonar-btn { border-color: rgba(255,216,107,.4); }
+#sonar-btn:not(:disabled):hover { background: rgba(255,216,107,.14); }
+#sonar-btn.armed { background: linear-gradient(135deg, var(--gold), #e0b54f); color: #2a2206; border-color: transparent; box-shadow: 0 0 0 3px rgba(255,216,107,.25), 0 8px 22px rgba(255,216,107,.25); }
+
+/* chat */
+.chat { max-width: 560px; margin: 22px auto 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+.chat-log { height: 132px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 4px 6px; margin-bottom: 8px; }
+.chat-log:empty::before { content: "Say hi to your opponent 🌊"; color: var(--muted); opacity: .6; font-size: .82rem; }
+.chat-msg { display: flex; flex-direction: column; max-width: 80%; align-self: flex-start; }
+.chat-msg.mine { align-self: flex-end; text-align: right; }
+.chat-who { font-size: .66rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.chat-body { background: var(--water-2); border: 1px solid var(--line); border-radius: 10px; padding: 6px 11px; font-size: .9rem; word-break: break-word; }
+.chat-msg.mine .chat-body { background: rgba(56,225,255,.14); border-color: rgba(56,225,255,.32); }
+.chat-emotes { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.emote { background: var(--water-2); border: 1px solid var(--line); border-radius: 9px; padding: 4px 9px; font-size: 1.05rem; cursor: pointer; transition: transform .1s, background .2s; }
+.emote:hover { transform: translateY(-1px); background: rgba(56,225,255,.12); }
+.chat-input { display: flex; gap: 8px; }
+.chat-input input { flex: 1; text-align: left; padding: 10px 12px; font-size: .95rem; }
+.chat-input .btn { padding: 10px 16px; }
+
+/* end-game stats */
+.stats { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 18px 0 4px; }
+.stat { background: var(--water-2); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; min-width: 86px; }
+.stat-val { display: block; font-size: 1.5rem; font-weight: 800; color: var(--cyan); }
+.stat-lab { display: block; font-size: .68rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
 
 /* game over */
 .over { max-width: 480px; margin: 50px auto; text-align: center; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 36px 26px; }

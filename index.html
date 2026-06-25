@@ -85,7 +85,7 @@
               <button id="random-btn" class="btn">🎲 Random</button>
               <button id="clear-btn" class="btn btn-ghost">Clear</button>
             </div>
-            <p class="tip">Click a cell to place the highlighted ship. Click a placed ship to pick it up again.</p>
+            <p class="tip">Click a cell to place the highlighted ship. Click a placed ship to pick it up again. Ships may not touch — keep at least one cell between them.</p>
             <button id="ready-btn" class="btn btn-primary btn-big" disabled>Ready for battle</button>
           </div>
         </div>
@@ -94,6 +94,9 @@
       <!-- BATTLE -->
       <section id="screen-battle" class="screen hidden">
         <div id="turn-banner" class="turn-banner">—</div>
+        <div class="battle-tools">
+          <button id="sonar-btn" class="btn" title="Scan a 3×3 patch of enemy waters (once per game). Costs your turn.">📡 Sonar (1)</button>
+        </div>
         <div class="battle-layout">
           <div class="board-col">
             <h3 class="board-title">🎯 Enemy Waters <small id="enemy-name"></small></h3>
@@ -110,6 +113,22 @@
             <ul id="my-fleet" class="fleet-status"></ul>
           </div>
         </div>
+
+        <div id="chat" class="chat">
+          <div id="chat-log" class="chat-log" aria-live="polite"></div>
+          <div class="chat-emotes">
+            <button type="button" class="emote">🔥</button>
+            <button type="button" class="emote">😅</button>
+            <button type="button" class="emote">😎</button>
+            <button type="button" class="emote">💀</button>
+            <button type="button" class="emote">🫡</button>
+            <button type="button" class="emote">⚓</button>
+          </div>
+          <form id="chat-form" class="chat-input">
+            <input id="chat-text" type="text" maxlength="120" placeholder="Taunt your opponent…" autocomplete="off" />
+            <button type="submit" class="btn">Send</button>
+          </form>
+        </div>
       </section>
 
       <!-- GAME OVER -->
@@ -117,6 +136,7 @@
         <div class="over">
           <h1 id="over-title">Victory!</h1>
           <p id="over-text" class="muted"></p>
+          <div id="over-stats" class="stats"></div>
           <div class="over-actions">
             <button id="rematch-btn" class="btn btn-primary btn-big">Rematch</button>
             <button id="home-btn" class="btn btn-ghost">Back to port</button>

@@ -53,5 +53,7 @@
     win() { [523, 659, 784, 1046].forEach((f, i) => setTimeout(() => tone(f, 0.28, "triangle", 0.2), i * 150)); },
     lose() { [440, 349, 262, 196].forEach((f, i) => setTimeout(() => tone(f, 0.32, "sawtooth", 0.16), i * 170)); },
     turn() { tone(680, 0.12, "sine", 0.1, 880); },
+    sonar() { tone(1200, 0.5, "sine", 0.14, 700); setTimeout(() => tone(1200, 0.45, "sine", 0.09, 760), 180); },
+    chat() { tone(880, 0.05, "sine", 0.06); tone(1175, 0.06, "sine", 0.05); },
   };
 })();

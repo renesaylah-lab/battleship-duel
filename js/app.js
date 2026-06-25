@@ -24,6 +24,8 @@
     oppRematch: false,
     restarting: false,
     joinTimer: null,
+    sonarLeft: 1,         // sonar sweeps remaining this game
+    sonarArmed: false,    // next click on enemy waters scans instead of fires
   };
 
   // ---------- DOM helpers ----------
@@ -83,6 +85,16 @@
 
   function eachCell(el, fn) {
     el.querySelectorAll(".cell").forEach(c => fn(c, +c.dataset.x, +c.dataset.y));
+  }
+
+  // A little hull silhouette whose length scales with the ship's size.
+  function shipIcon(size) {
+    let segs = "";
+    for (let i = 0; i < size; i++) {
+      const cls = "seg" + (i === size - 1 ? " bow" : "") + (i === 1 ? " tower" : "");
+      segs += '<span class="' + cls + '"></span>';
+    }
+    return '<span class="ship-icon" aria-hidden="true">' + segs + "</span>";
   }
 
   // ---------- Home ----------
@@ -242,6 +254,16 @@
       case "result":
         handleResult(msg);
         break;
+      case "sonar":
+        handleIncomingSonar(msg.x, msg.y);
+        break;
+      case "sonar-result":
+        handleSonarResult(msg);
+        break;
+      case "chat":
+        addChat(state.oppName, msg.text, false);
+        sfx.chat();
+        break;
       case "rematch":
         state.oppRematch = true;
         if (!state.myRematch) { toast(state.oppName + " wants a rematch!"); $("#rematch-btn").classList.add("btn-primary"); }
@@ -309,8 +331,7 @@
     game.ships.forEach(sh => {
       const li = document.createElement("li");
       li.className = "ship-item" + (sh.placed ? " placed" : "") + (sh.id === state.selectedShip ? " selected" : "");
-      const pips = Array.from({ length: sh.size }, () => '<span class="pip"></span>').join("");
-      li.innerHTML = '<span class="ship-name">' + sh.name + "</span><span class='pips'>" + pips + "</span>";
+      li.innerHTML = '<span class="ship-name">' + sh.name + "</span>" + shipIcon(sh.size);
       li.addEventListener("click", () => {
         if (sh.placed) { game.remove(sh.id); }
         state.selectedShip = sh.id;
@@ -415,6 +436,8 @@
     if (state.started) return;
     state.started = true;
     state.myTurn = net.isHost ? (first === "host") : (first === "guest");
+    state.sonarLeft = 1;
+    state.sonarArmed = false;
     enterBattle();
   }
 
@@ -423,6 +446,7 @@
     game.phase = "battle";
     show("#screen-battle");
     updateNames();
+    clearChat();
     buildGrid($("#my-board"), false, null, null);
     buildGrid($("#enemy-board"), true, enemyClick, null);
     renderBattle();
@@ -448,11 +472,18 @@
       const t = game.tracking[y][x];
       if (t === "hit") c.classList.add("hit");
       else if (t === "miss") c.classList.add("miss");
+      else {
+        const s = game.scan[y][x];
+        if (s === "ship") c.classList.add("scan-ship");
+        else if (s === "clear") c.classList.add("scan-clear");
+      }
     });
     enemy.classList.toggle("active", state.myTurn && !state.pending && game.phase === "battle");
+    enemy.classList.toggle("aiming-sonar", state.sonarArmed);
 
     renderFleets();
     renderBanner();
+    updateSonarBtn();
   }
 
   function renderFleets() {
@@ -463,7 +494,7 @@
       const sunk = game.enemySunk.includes(s.name);
       const li = document.createElement("li");
       li.className = sunk ? "sunk" : "";
-      li.textContent = s.name + " (" + s.size + ")";
+      li.innerHTML = shipIcon(s.size) + '<span class="fleet-name">' + s.name + "</span>";
       ef.appendChild(li);
     });
     // My ships still afloat.
@@ -473,7 +504,7 @@
       const dead = s.hits >= s.size;
       const li = document.createElement("li");
       li.className = dead ? "sunk" : "";
-      li.textContent = s.name + " (" + s.size + ")";
+      li.innerHTML = shipIcon(s.size) + '<span class="fleet-name">' + s.name + "</span>";
       mf.appendChild(li);
     });
   }
@@ -496,6 +527,7 @@
   function enemyClick(x, y) {
     if (game.phase !== "battle" || !state.myTurn || state.pending) return;
     if (game.tracking[y][x] !== null) return;
+    if (state.sonarArmed) { fireSonar(x, y); return; }
     state.pending = true;
     sfx.fire();
     const cell = $("#enemy-board").querySelector('.cell[data-x="' + x + '"][data-y="' + y + '"]');
@@ -503,6 +535,59 @@
     $("#enemy-board").classList.remove("active");
     net.send({ type: "fire", x, y });
     renderBanner();
+  }
+
+  // ---------- Sonar ----------
+  function fireSonar(x, y) {
+    if (state.sonarLeft <= 0) return;
+    state.sonarLeft--;
+    state.sonarArmed = false;
+    state.pending = true;
+    sfx.sonar();
+    net.send({ type: "sonar", x, y });
+    $("#enemy-board").classList.remove("active");
+    renderBattle();
+  }
+
+  // The opponent swept my waters — report contacts and take my turn next.
+  function handleIncomingSonar(x, y) {
+    const cells = game.sonarScan(x, y);
+    net.send({ type: "sonar-result", cells });
+    sfx.sonar();
+    toast(state.oppName + " swept the waters with sonar 📡");
+    state.myTurn = true;
+    sfx.turn();
+    renderBattle();
+  }
+
+  // My sonar sweep came back with intel. It cost me my turn.
+  function handleSonarResult(msg) {
+    state.pending = false;
+    game.recordScan(msg.cells || []);
+    const found = (msg.cells || []).filter(c => c.ship).length;
+    toast(found
+      ? "📡 Sonar: " + found + " contact" + (found > 1 ? "s" : "") + " detected!"
+      : "📡 Sonar: these waters are clear.");
+    state.myTurn = false;
+    renderBattle();
+  }
+
+  function updateSonarBtn() {
+    const b = $("#sonar-btn");
+    if (!b) return;
+    b.textContent = "📡 Sonar (" + state.sonarLeft + ")";
+    b.disabled = state.sonarLeft <= 0 || !state.myTurn || state.pending || game.phase !== "battle";
+    b.classList.toggle("armed", state.sonarArmed);
+  }
+
+  function toggleSonar() {
+    if (state.sonarLeft <= 0 || !state.myTurn || state.pending) return;
+    state.sonarArmed = !state.sonarArmed;
+    sfx.click();
+    toast(state.sonarArmed
+      ? "Sonar armed — click an area on Enemy Waters to scan a 3×3 patch."
+      : "Sonar disarmed.");
+    renderBattle();
   }
 
   // The enemy reported the result of MY shot.
@@ -542,6 +627,7 @@
     $("#over-text").textContent = won
       ? "You sent " + state.oppName + "'s fleet to the depths. Glorious."
       : state.oppName + " sank your whole fleet. Regroup and try again!";
+    renderStats();
     $("#rematch-status").textContent = "";
     $("#rematch-btn").textContent = "Rematch";
     $("#rematch-btn").disabled = false;
@@ -563,6 +649,11 @@
     $("#home-btn").addEventListener("click", backHome);
   }
 
+  function setupBattle() {
+    const s = $("#sonar-btn");
+    if (s) s.addEventListener("click", toggleSonar);
+  }
+
   function maybeRematch() {
     if (state.myRematch && state.oppRematch && !state.restarting) {
       state.restarting = true;
@@ -576,6 +667,62 @@
       toast("Rematch! Deploy your fleet.");
       enterPlacement();
     }
+  }
+
+  function renderStats() {
+    const box = $("#over-stats");
+    if (!box) return;
+    const mine = BS.Game.gridStats(game.tracking);   // shots I fired at the enemy
+    const theirs = BS.Game.gridStats(game.incoming);  // shots that landed on me
+    const sunk = game.enemySunk.length;
+    const rows = [
+      ["Shots fired", mine.shots],
+      ["Hits landed", mine.hits],
+      ["Accuracy", mine.accuracy + "%"],
+      ["Ships sunk", sunk + " / " + BS.SHIPS.length],
+      ["Hits taken", theirs.hits],
+    ];
+    box.innerHTML = rows.map(r =>
+      '<div class="stat"><span class="stat-val">' + r[1] + '</span><span class="stat-lab">' + r[0] + "</span></div>"
+    ).join("");
+  }
+
+  // ---------- Chat ----------
+  function setupChat() {
+    const form = $("#chat-form");
+    if (form) {
+      form.addEventListener("submit", e => {
+        e.preventDefault();
+        sendChat($("#chat-text").value);
+        $("#chat-text").value = "";
+      });
+    }
+    $$(".emote").forEach(b => b.addEventListener("click", () => sendChat(b.textContent)));
+  }
+
+  function sendChat(text) {
+    text = (text || "").trim().slice(0, 120);
+    if (!text || !net.conn || !net.conn.open) return;
+    net.send({ type: "chat", text });
+    addChat(state.myName, text, true);
+    sfx.chat();
+  }
+
+  function addChat(who, text, mine) {
+    const log = $("#chat-log");
+    if (!log) return;
+    const div = document.createElement("div");
+    div.className = "chat-msg" + (mine ? " mine" : "");
+    const w = document.createElement("span"); w.className = "chat-who"; w.textContent = who || (mine ? "You" : "Opponent");
+    const b = document.createElement("span"); b.className = "chat-body"; b.textContent = text;
+    div.appendChild(w); div.appendChild(b);
+    log.appendChild(div);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function clearChat() {
+    const log = $("#chat-log");
+    if (log) log.innerHTML = "";
   }
 
   // ---------- Sound toggle ----------
@@ -597,6 +744,8 @@
     setupHome();
     setupLobby();
     setupPlacement();
+    setupBattle();
+    setupChat();
     setupOver();
     setupNet();
     setupMute();

@@ -16,8 +16,18 @@ ever see the other's board.
 3. Your friend opens the link (or enters the code) and joins.
 4. Both players deploy their fleet (5 ships). Click a cell to place the highlighted
    ship, press **R** or **Rotate** to turn it, or hit **🎲 Random**.
+   Like the classic rules, **ships may not touch** — not even diagonally.
 5. Click **Ready**. When both are ready, the battle begins — players alternate firing
    one shot per turn at "Enemy Waters". First to sink the enemy's whole fleet wins.
+
+## Features
+
+- **No-touch deployment** — ships must keep at least one cell of clear water between them.
+- **📡 Sonar sweep** — once per game you can spend a turn to scan a 3×3 patch of enemy
+  waters; gold rings mark detected ships, faint blue dots mark clear water (intel only,
+  no damage).
+- **💬 In-game chat & emotes** — taunt your opponent during the battle.
+- **📊 End-of-game stats** — shots fired, hits, accuracy, ships sunk and hits taken.
 
 ## Run it locally
 

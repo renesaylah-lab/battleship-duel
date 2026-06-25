@@ -26,9 +26,9 @@ ever see the other's board.
 - **No-touch deployment** — ships must keep at least one cell of clear water between them.
 - **Hit = fire again** — land a hit and you keep shooting; only a miss ends your turn.
 - **🤖 Solo vs computer** — no opponent around? Play a local bot with a hunt/target AI.
-- **📡 Sonar sweep** — once per game you can spend a turn to scan a 3×3 patch of enemy
-  waters; gold rings mark detected ships, faint blue dots mark clear water (intel only,
-  no damage).
+- **📡 Sonar sweep** — once per game, scan a 3×3 patch of enemy waters for free (you still
+  take your shot); gold rings mark detected ships, faint blue dots mark clear water
+  (intel only, no damage).
 - **💬 In-game chat & emotes** — taunt your opponent during the battle.
 - **🏳️ Surrender** — concede a hopeless battle cleanly.
 - **📊 Stats & series** — end-of-game shots/hits/accuracy plus a running win–loss tally

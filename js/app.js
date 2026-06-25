@@ -635,7 +635,8 @@
     renderBattle();
   }
 
-  // The opponent swept my waters — report contacts and take my turn next.
+  // The opponent swept my waters — report contacts. Sonar is a free scan, so it
+  // does NOT change whose turn it is.
   function handleIncomingSonar(x, y, seq) {
     const cells = game.sonarScan(x, y);
     net.send({ type: "sonar-result", cells: cells, seq: seq });
@@ -643,12 +644,10 @@
     state.lastSonarSeq = seq;
     sfx.sonar();
     toast(state.oppName + " swept the waters with sonar 📡");
-    state.myTurn = true;
-    sfx.turn();
     renderBattle();
   }
 
-  // My sonar sweep came back with intel. It cost me my turn.
+  // My sonar sweep came back with intel. It's free — I still get my shot.
   function handleSonarResult(msg) {
     // ignore a duplicate or stale reply (must match the sonar we're waiting on)
     if (!state.pending || !state.pendingShot || msg.seq !== state.pendingShot.seq) return;
@@ -657,10 +656,9 @@
     game.recordScan(msg.cells || []);
     const found = (msg.cells || []).filter(c => c.ship).length;
     toast(found
-      ? "📡 Sonar: " + found + " contact" + (found > 1 ? "s" : "") + " detected!"
-      : "📡 Sonar: these waters are clear.");
-    state.myTurn = false;
-    renderBattle();
+      ? "📡 Sonar: " + found + " contact" + (found > 1 ? "s" : "") + " detected — now fire!"
+      : "📡 Sonar: these waters are clear — fire away!");
+    renderBattle();   // my turn continues
   }
 
   function updateSonarBtn() {

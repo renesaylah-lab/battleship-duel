@@ -596,12 +596,14 @@
     game.recordResult(msg.x, msg.y, msg.result, msg.sunk);
     if (msg.result === "hit") {
       sfx.hit();
-      if (msg.sunk) { sfx.sunk(); toast("💥 You sank " + state.oppName + "'s " + msg.sunk + "!"); }
+      if (msg.sunk) { sfx.sunk(); toast("💥 You sank " + state.oppName + "'s " + msg.sunk + "! Fire again!"); }
+      else { toast("🎯 Direct hit — fire again!"); }
     } else {
       sfx.miss();
     }
     if (msg.defeated) { renderBattle(); endGame(true); return; }
-    state.myTurn = false;
+    // Classic rule: a hit earns another shot; only a miss ends your turn.
+    state.myTurn = msg.result === "hit";
     renderBattle();
   }
 
@@ -612,8 +614,9 @@
     if (r.result === "hit") { sfx.hit(); if (r.sunk) sfx.sunk(); }
     else sfx.miss();
     if (r.defeated) { renderBattle(); endGame(false); return; }
-    state.myTurn = true;
-    sfx.turn();
+    // The shooter keeps firing after a hit — I only get the turn back on a miss.
+    state.myTurn = r.result === "miss";
+    if (state.myTurn) sfx.turn();
     renderBattle();
   }
 

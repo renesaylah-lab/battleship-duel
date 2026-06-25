@@ -17,8 +17,9 @@ ever see the other's board.
 4. Both players deploy their fleet (5 ships). Click a cell to place the highlighted
    ship, press **R** or **Rotate** to turn it, or hit **🎲 Random**.
    Like the classic rules, **ships may not touch** — not even diagonally.
-5. Click **Ready**. When both are ready, the battle begins — players alternate firing
-   one shot per turn at "Enemy Waters". First to sink the enemy's whole fleet wins.
+5. Click **Ready**. When both are ready, the battle begins — players take turns firing
+   at "Enemy Waters". Land a hit and you fire again; miss and it's the enemy's turn.
+   First to sink the enemy's whole fleet wins.
 
 ## Features
 

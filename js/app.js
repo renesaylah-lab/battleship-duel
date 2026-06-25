@@ -18,6 +18,11 @@
     streak: 0,            // my current run of consecutive hits
     lastIncoming: null,   // {x,y} the opponent last fired at me
     peerLeft: false,      // opponent left on purpose (clean 'bye')
+    pendingShot: null,    // the fire/sonar message we're awaiting a reply for
+    pendingTimer: null,   // watchdog that re-sends a shot if the reply is lost
+    pendingRetries: 0,
+    shotSeq: 0,           // monotonic id per shot, so a late reply can't match a newer shot
+    lastSonarSeq: null,   // dedupe a re-sent sonar sweep
     placeHorizontal: true,
     selectedShip: 0,
     preview: null,        // {x, y} while hovering during placement
@@ -189,6 +194,7 @@
 
   function backHome() {
     clearTimeout(state.joinTimer);
+    clearPending();
     if (!state.vsBot && net.conn && net.conn.open) net.send({ type: "bye" });
     net.close();
     setConn(false);
@@ -210,6 +216,8 @@
     state.selectedShip = 0; state.placeHorizontal = true; state.preview = null;
     state.streak = 0; state.lastIncoming = null;
     state.sonarLeft = 1; state.sonarArmed = false;
+    state.lastSonarSeq = null;
+    clearPending();
   }
 
   // ---------- Networking events ----------
@@ -278,13 +286,13 @@
         if (!net.isHost) beginBattle(msg.first);
         break;
       case "fire":
-        handleIncomingFire(msg.x, msg.y);
+        handleIncomingFire(msg.x, msg.y, msg.seq);
         break;
       case "result":
         handleResult(msg);
         break;
       case "sonar":
-        handleIncomingSonar(msg.x, msg.y);
+        handleIncomingSonar(msg.x, msg.y, msg.seq);
         break;
       case "sonar-result":
         handleSonarResult(msg);
@@ -586,8 +594,33 @@
     const cell = $("#enemy-board").querySelector('.cell[data-x="' + x + '"][data-y="' + y + '"]');
     if (cell) cell.classList.add("firing");
     $("#enemy-board").classList.remove("active");
-    net.send({ type: "fire", x, y });
+    sendPending({ type: "fire", x, y });
     renderBanner();
+  }
+
+  // ---------- Lost-message resilience ----------
+  // Send a shot and keep a watchdog: if the reply never arrives (a dropped
+  // message on a flaky link), re-send it. Replies are idempotent on both sides.
+  function sendPending(msg) {
+    msg.seq = ++state.shotSeq;
+    state.pendingShot = msg;
+    state.pendingRetries = 0;
+    clearInterval(state.pendingTimer);
+    state.pendingTimer = setInterval(() => {
+      if (!state.pending || !state.pendingShot || game.phase !== "battle") { clearPending(); return; }
+      state.pendingRetries++;
+      if (state.pendingRetries === 3) toast("Connection seems slow — still trying to reach " + state.oppName + "…");
+      if (state.pendingRetries > 15) { clearInterval(state.pendingTimer); state.pendingTimer = null; toast("No reply from " + state.oppName + ". Check your connection or restart the match."); return; }
+      net.send(state.pendingShot);
+    }, 4000);
+    net.send(msg);
+  }
+
+  function clearPending() {
+    clearInterval(state.pendingTimer);
+    state.pendingTimer = null;
+    state.pendingShot = null;
+    state.pendingRetries = 0;
   }
 
   // ---------- Sonar ----------
@@ -597,15 +630,17 @@
     state.sonarArmed = false;
     state.pending = true;
     sfx.sonar();
-    net.send({ type: "sonar", x, y });
+    sendPending({ type: "sonar", x, y });
     $("#enemy-board").classList.remove("active");
     renderBattle();
   }
 
   // The opponent swept my waters — report contacts and take my turn next.
-  function handleIncomingSonar(x, y) {
+  function handleIncomingSonar(x, y, seq) {
     const cells = game.sonarScan(x, y);
-    net.send({ type: "sonar-result", cells });
+    net.send({ type: "sonar-result", cells: cells, seq: seq });
+    if (seq != null && seq === state.lastSonarSeq) return;   // re-sent sonar: re-ack only
+    state.lastSonarSeq = seq;
     sfx.sonar();
     toast(state.oppName + " swept the waters with sonar 📡");
     state.myTurn = true;
@@ -615,7 +650,10 @@
 
   // My sonar sweep came back with intel. It cost me my turn.
   function handleSonarResult(msg) {
+    // ignore a duplicate or stale reply (must match the sonar we're waiting on)
+    if (!state.pending || !state.pendingShot || msg.seq !== state.pendingShot.seq) return;
     state.pending = false;
+    clearPending();
     game.recordScan(msg.cells || []);
     const found = (msg.cells || []).filter(c => c.ship).length;
     toast(found
@@ -645,7 +683,10 @@
 
   // The enemy reported the result of MY shot.
   function handleResult(msg) {
+    // ignore a duplicate or stale reply (must match the shot we're waiting on)
+    if (!state.pending || !state.pendingShot || msg.seq !== state.pendingShot.seq) return;
     state.pending = false;
+    clearPending();
     game.recordResult(msg.x, msg.y, msg.result, msg.sunk, msg.sunkCells);
     if (msg.result === "hit") {
       sfx.hit();
@@ -679,9 +720,15 @@
   }
 
   // The opponent fired at ME.
-  function handleIncomingFire(x, y) {
+  function handleIncomingFire(x, y, seq) {
+    const duplicate = game.incoming[y][x] !== null;
     const r = game.receiveFire(x, y);
-    net.send({ type: "result", x, y, result: r.result, sunk: r.sunk, sunkCells: r.sunkCells, defeated: r.defeated });
+    net.send({ type: "result", x, y, result: r.result, sunk: r.sunk, sunkCells: r.sunkCells, defeated: r.defeated, seq: seq });
+    if (duplicate) return;   // re-sent shot: just re-acknowledge; don't touch turn/pending
+    // A genuine new shot from the opponent means my own pending shot already
+    // resolved on their side (a miss handed them the turn). Stop awaiting its
+    // reply so a late result can't clobber the turn they just handed back.
+    if (state.pending) { state.pending = false; clearPending(); }
     state.lastIncoming = { x, y };
     if (r.result === "hit") { sfx.hit(); if (r.sunk) sfx.sunk(); }
     else sfx.miss();
@@ -695,7 +742,9 @@
 
   // ---------- Game over ----------
   function endGame(won) {
+    if (game.phase === "over") return;   // guard against duplicate/late messages
     game.phase = "over";
+    clearPending();
     if (won) state.wins++; else state.losses++;
     state.sonarArmed = false;
     show("#screen-over");

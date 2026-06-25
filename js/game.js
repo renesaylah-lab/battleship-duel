@@ -104,6 +104,17 @@
     // The opponent fired at (x, y) on MY board. Returns the outcome to report back.
     receiveFire(x, y) {
       const id = this.board[y][x];
+      // Idempotent: if this cell was already fired upon, report the same outcome
+      // without counting the hit twice — lets a lost message be safely re-sent.
+      if (this.incoming[y][x] !== null) {
+        let sunk = null, sunkCells = null;
+        if (id !== null) {
+          const sh = this.ship(id);
+          if (sh.hits >= sh.size) { sunk = sh.name; sunkCells = sh.cells.map(c => ({ x: c.x, y: c.y })); }
+        }
+        const defeated = this.ships.every(s => s.hits >= s.size);
+        return { x, y, result: this.incoming[y][x], sunk, sunkCells, defeated };
+      }
       let result, sunk = null, sunkCells = null;
       if (id === null) {
         this.incoming[y][x] = "miss";

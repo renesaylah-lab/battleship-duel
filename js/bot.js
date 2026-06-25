@@ -55,7 +55,7 @@
     _onHumanFire(obj) {
       const r = this.bot.receiveFire(obj.x, obj.y);
       setTimeout(() => {
-        this._deliver({ type: "result", x: obj.x, y: obj.y, result: r.result, sunk: r.sunk, sunkCells: r.sunkCells, defeated: r.defeated });
+        this._deliver({ type: "result", x: obj.x, y: obj.y, result: r.result, sunk: r.sunk, sunkCells: r.sunkCells, defeated: r.defeated, seq: obj.seq });
         if (r.defeated) return;                 // human won
         if (r.result === "miss") this._botTurn(900);   // a miss hands the turn to the bot
       }, 500);
@@ -64,7 +64,7 @@
     _onHumanSonar(obj) {
       const cells = this.bot.sonarScan(obj.x, obj.y);
       setTimeout(() => {
-        this._deliver({ type: "sonar-result", cells: cells });
+        this._deliver({ type: "sonar-result", cells: cells, seq: obj.seq });
         this._botTurn(900);                     // sonar costs the human's turn
       }, 450);
     }

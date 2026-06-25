@@ -34,8 +34,6 @@ ever see the other's board.
 - **📊 Stats & series** — end-of-game shots/hits/accuracy plus a running win–loss tally
   across rematches.
 - **Sinking animations, hit-streak callouts and a marker** showing where the enemy last fired.
-- **Auto-reconnect** — a dropped peer connection is retried for a while before giving up,
-  so a brief network blip doesn't end the match.
 
 ## Run it locally
 

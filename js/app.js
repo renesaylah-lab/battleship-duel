@@ -17,9 +17,7 @@
     losses: 0,
     streak: 0,            // my current run of consecutive hits
     lastIncoming: null,   // {x,y} the opponent last fired at me
-    reconnecting: false,
-    reconnectTimer: null,
-    peerLeft: false,      // opponent left on purpose — don't try to reconnect
+    peerLeft: false,      // opponent left on purpose (clean 'bye')
     placeHorizontal: true,
     selectedShip: 0,
     preview: null,        // {x, y} while hovering during placement
@@ -191,9 +189,6 @@
 
   function backHome() {
     clearTimeout(state.joinTimer);
-    clearInterval(state.reconnectTimer);
-    state.reconnecting = false;
-    showReconnect(false);
     if (!state.vsBot && net.conn && net.conn.open) net.send({ type: "bye" });
     net.close();
     setConn(false);
@@ -227,7 +222,6 @@
     net.on("connected", () => {
       clearTimeout(state.joinTimer);
       setConn(true);
-      if (state.reconnecting) { onReconnected(); return; }
       net.send({ type: "hello", name: state.myName });
       toast(state.vsBot ? "Battle stations!" : "Connected! Battle stations.");
       enterPlacement();
@@ -238,8 +232,8 @@
     net.on("closed", () => {
       setConn(false);
       if (game.phase === "over" || state.vsBot) return;
-      if (state.peerLeft) { toast(state.oppName + " left the game."); setTimeout(backHome, 1200); return; }
-      attemptReconnect();
+      toast(state.peerLeft ? state.oppName + " left the game." : "Connection to " + state.oppName + " lost.");
+      setTimeout(backHome, 1500);
     });
 
     net.on("peererror", e => {
@@ -254,45 +248,6 @@
     });
 
     net.on("connerror", () => { /* surfaced via 'closed' in practice */ });
-  }
-
-  // ---------- Reconnect (best-effort) ----------
-  function attemptReconnect() {
-    if (state.reconnecting) return;
-    state.reconnecting = true;
-    showReconnect(true);
-    let tries = 0;
-    clearInterval(state.reconnectTimer);
-    const tick = () => {
-      if (net.conn && net.conn.open) { clearInterval(state.reconnectTimer); return; }
-      if (++tries > 6) {   // ~24s of trying
-        clearInterval(state.reconnectTimer);
-        state.reconnecting = false;
-        showReconnect(false);
-        toast("Couldn't reach " + state.oppName + ". Returning to port.");
-        setTimeout(backHome, 900);
-        return;
-      }
-      net.reconnect(state.code);
-    };
-    tick();
-    state.reconnectTimer = setInterval(tick, 4000);
-  }
-
-  function onReconnected() {
-    state.reconnecting = false;
-    clearInterval(state.reconnectTimer);
-    showReconnect(false);
-    setConn(true);
-    toast("Reconnected — back to battle!");
-    if (net.isHost) net.send({ type: "resync", phase: game.phase, hostTurn: state.myTurn });
-    if (game.phase === "battle") { show("#screen-battle"); renderBattle(); }
-    else if (game.phase === "placement") { show("#screen-place"); }
-  }
-
-  function showReconnect(on) {
-    const el = $("#reconnect-overlay");
-    if (el) el.classList.toggle("hidden", !on);
   }
 
   // ---------- Solo vs computer ----------
@@ -345,12 +300,6 @@
         break;
       case "surrender":
         if (game.phase === "battle") { toast(state.oppName + " surrendered! ⚓"); endGame(true); }
-        break;
-      case "resync":
-        if (!net.isHost && msg.phase === "battle") {
-          state.myTurn = !msg.hostTurn;
-          if (game.phase === "battle") { show("#screen-battle"); renderBattle(); }
-        }
         break;
       case "bye":
         state.peerLeft = true;

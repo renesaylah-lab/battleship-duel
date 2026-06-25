@@ -215,11 +215,6 @@ kbd { background: rgba(255,255,255,.12); border-radius: 5px; padding: 1px 6px; f
 .solo-row { display: flex; align-items: center; justify-content: center; gap: 14px; max-width: 720px; margin: 22px auto 0; }
 .or-sep { color: var(--muted); font-size: .85rem; text-transform: uppercase; letter-spacing: .12em; }
 
-/* reconnect overlay */
-.overlay { position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 24px; background: rgba(4,16,28,.84); backdrop-filter: blur(4px); }
-.overlay .spinner { margin: 0 0 4px; }
-.overlay p { margin: 0; font-size: 1.05rem; }
-
 /* chat */
 .chat { max-width: 560px; margin: 22px auto 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
 .chat-log { height: 132px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 4px 6px; margin-bottom: 8px; }

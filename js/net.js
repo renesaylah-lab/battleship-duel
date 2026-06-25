@@ -59,31 +59,6 @@
       this.peer.on("error", e => this.emit("peererror", e));
     }
 
-    // Best-effort reconnect after a dropped DataConnection, reusing the code.
-    // The host keeps its fixed-id peer alive and just waits for the guest to
-    // re-dial; the guest re-creates its peer and connects again.
-    reconnect(code) {
-      if (this.isHost) {
-        if (!this.peer || this.peer.destroyed) {
-          this.peer = new Peer(PREFIX + code);
-          this.peer.on("connection", conn => {
-            if (this.conn && this.conn.open) { conn.close(); return; }
-            this._bindConn(conn);
-          });
-          this.peer.on("error", e => this.emit("peererror", e));
-        }
-        // else: existing peer is still listening for the guest to return.
-      } else {
-        if (!this.peer || this.peer.destroyed) {
-          this.peer = new Peer();
-          this.peer.on("open", () => this._bindConn(this.peer.connect(PREFIX + code, { reliable: true })));
-          this.peer.on("error", e => this.emit("peererror", e));
-        } else {
-          this._bindConn(this.peer.connect(PREFIX + code, { reliable: true }));
-        }
-      }
-    }
-
     close() {
       try { if (this.conn) this.conn.close(); } catch (e) {}
       try { if (this.peer) this.peer.destroy(); } catch (e) {}

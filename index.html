@@ -46,6 +46,10 @@
             <button id="join-btn" class="btn">Join game</button>
           </div>
         </div>
+        <div class="solo-row">
+          <span class="or-sep">or</span>
+          <button id="bot-btn" class="btn">🤖 Play vs Computer</button>
+        </div>
         <p id="home-hint" class="hint"></p>
       </section>
 
@@ -94,8 +98,10 @@
       <!-- BATTLE -->
       <section id="screen-battle" class="screen hidden">
         <div id="turn-banner" class="turn-banner">—</div>
+        <div id="scoreboard" class="scoreboard hidden"></div>
         <div class="battle-tools">
           <button id="sonar-btn" class="btn" title="Scan a 3×3 patch of enemy waters (once per game). Costs your turn.">📡 Sonar (1)</button>
+          <button id="surrender-btn" class="btn btn-ghost" title="Concede this battle.">🏳️ Surrender</button>
         </div>
         <div class="battle-layout">
           <div class="board-col">
@@ -137,6 +143,7 @@
           <h1 id="over-title">Victory!</h1>
           <p id="over-text" class="muted"></p>
           <div id="over-stats" class="stats"></div>
+          <p id="over-series" class="series muted"></p>
           <div class="over-actions">
             <button id="rematch-btn" class="btn btn-primary btn-big">Rematch</button>
             <button id="home-btn" class="btn btn-ghost">Back to port</button>
@@ -153,10 +160,17 @@
 
   <div id="toast" class="toast"></div>
 
+  <div id="reconnect-overlay" class="overlay hidden">
+    <div class="spinner"></div>
+    <p>Connection lost — trying to reconnect…</p>
+    <p class="muted">Keep this tab open. Your fleet is safe.</p>
+  </div>
+
   <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/game.js"></script>
   <script src="js/net.js"></script>
+  <script src="js/bot.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

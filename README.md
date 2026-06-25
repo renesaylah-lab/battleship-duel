@@ -24,11 +24,18 @@ ever see the other's board.
 ## Features
 
 - **No-touch deployment** — ships must keep at least one cell of clear water between them.
+- **Hit = fire again** — land a hit and you keep shooting; only a miss ends your turn.
+- **🤖 Solo vs computer** — no opponent around? Play a local bot with a hunt/target AI.
 - **📡 Sonar sweep** — once per game you can spend a turn to scan a 3×3 patch of enemy
   waters; gold rings mark detected ships, faint blue dots mark clear water (intel only,
   no damage).
 - **💬 In-game chat & emotes** — taunt your opponent during the battle.
-- **📊 End-of-game stats** — shots fired, hits, accuracy, ships sunk and hits taken.
+- **🏳️ Surrender** — concede a hopeless battle cleanly.
+- **📊 Stats & series** — end-of-game shots/hits/accuracy plus a running win–loss tally
+  across rematches.
+- **Sinking animations, hit-streak callouts and a marker** showing where the enemy last fired.
+- **Auto-reconnect** — a dropped peer connection is retried for a while before giving up,
+  so a brief network blip doesn't end the match.
 
 ## Run it locally
 

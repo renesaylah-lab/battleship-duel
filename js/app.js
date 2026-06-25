@@ -6,12 +6,20 @@
   const LETTERS = "ABCDEFGHIJ";
 
   const game = new BS.Game();
-  const net = new BS.Net();
+  let net = new BS.Net();
 
   const state = {
     myName: "",
     oppName: "Opponent",
     code: "",
+    vsBot: false,
+    wins: 0,              // session tally across rematches
+    losses: 0,
+    streak: 0,            // my current run of consecutive hits
+    lastIncoming: null,   // {x,y} the opponent last fired at me
+    reconnecting: false,
+    reconnectTimer: null,
+    peerLeft: false,      // opponent left on purpose — don't try to reconnect
     placeHorizontal: true,
     selectedShip: 0,
     preview: null,        // {x, y} while hovering during placement
@@ -124,6 +132,7 @@
     });
     $("#join-code").addEventListener("keydown", e => { if (e.key === "Enter") $("#join-btn").click(); });
     $("#name-input").addEventListener("input", () => localStorage.setItem("bs-name", $("#name-input").value.trim()));
+    $("#bot-btn").addEventListener("click", startBot);
   }
 
   function requireName() {
@@ -182,10 +191,19 @@
 
   function backHome() {
     clearTimeout(state.joinTimer);
+    clearInterval(state.reconnectTimer);
+    state.reconnecting = false;
+    showReconnect(false);
+    if (!state.vsBot && net.conn && net.conn.open) net.send({ type: "bye" });
     net.close();
     setConn(false);
     resetMatchState();
+    state.wins = 0; state.losses = 0;
+    state.vsBot = false; state.peerLeft = false;
+    state.oppName = "Opponent";
     game.reset();
+    net = new BS.Net();
+    bindNetHandlers();
     show("#screen-home");
   }
 
@@ -195,17 +213,23 @@
     state.started = false; state.restarting = false;
     state.myRematch = false; state.oppRematch = false;
     state.selectedShip = 0; state.placeHorizontal = true; state.preview = null;
+    state.streak = 0; state.lastIncoming = null;
+    state.sonarLeft = 1; state.sonarArmed = false;
   }
 
   // ---------- Networking events ----------
-  function setupNet() {
+  function setupNet() { bindNetHandlers(); }
+
+  // Attaches all handlers to the current `net` (a real BS.Net or a BS.BotNet).
+  function bindNetHandlers() {
     net.on("open", () => { /* host id is ready; nothing else needed */ });
 
     net.on("connected", () => {
       clearTimeout(state.joinTimer);
       setConn(true);
+      if (state.reconnecting) { onReconnected(); return; }
       net.send({ type: "hello", name: state.myName });
-      toast("Connected! Battle stations.");
+      toast(state.vsBot ? "Battle stations!" : "Connected! Battle stations.");
       enterPlacement();
     });
 
@@ -213,10 +237,9 @@
 
     net.on("closed", () => {
       setConn(false);
-      if (game.phase !== "over") {
-        toast(state.oppName + " left the game.");
-        setTimeout(backHome, 1500);
-      }
+      if (game.phase === "over" || state.vsBot) return;
+      if (state.peerLeft) { toast(state.oppName + " left the game."); setTimeout(backHome, 1200); return; }
+      attemptReconnect();
     });
 
     net.on("peererror", e => {
@@ -231,6 +254,57 @@
     });
 
     net.on("connerror", () => { /* surfaced via 'closed' in practice */ });
+  }
+
+  // ---------- Reconnect (best-effort) ----------
+  function attemptReconnect() {
+    if (state.reconnecting) return;
+    state.reconnecting = true;
+    showReconnect(true);
+    let tries = 0;
+    clearInterval(state.reconnectTimer);
+    const tick = () => {
+      if (net.conn && net.conn.open) { clearInterval(state.reconnectTimer); return; }
+      if (++tries > 6) {   // ~24s of trying
+        clearInterval(state.reconnectTimer);
+        state.reconnecting = false;
+        showReconnect(false);
+        toast("Couldn't reach " + state.oppName + ". Returning to port.");
+        setTimeout(backHome, 900);
+        return;
+      }
+      net.reconnect(state.code);
+    };
+    tick();
+    state.reconnectTimer = setInterval(tick, 4000);
+  }
+
+  function onReconnected() {
+    state.reconnecting = false;
+    clearInterval(state.reconnectTimer);
+    showReconnect(false);
+    setConn(true);
+    toast("Reconnected — back to battle!");
+    if (net.isHost) net.send({ type: "resync", phase: game.phase, hostTurn: state.myTurn });
+    if (game.phase === "battle") { show("#screen-battle"); renderBattle(); }
+    else if (game.phase === "placement") { show("#screen-place"); }
+  }
+
+  function showReconnect(on) {
+    const el = $("#reconnect-overlay");
+    if (el) el.classList.toggle("hidden", !on);
+  }
+
+  // ---------- Solo vs computer ----------
+  function startBot() {
+    if (!requireName()) return;
+    net.close();
+    net = new BS.BotNet();
+    bindNetHandlers();
+    state.vsBot = true;
+    state.code = "BOT";
+    state.oppName = "Admiral Bot";
+    net.start();
   }
 
   function onMessage(msg) {
@@ -268,6 +342,18 @@
         state.oppRematch = true;
         if (!state.myRematch) { toast(state.oppName + " wants a rematch!"); $("#rematch-btn").classList.add("btn-primary"); }
         maybeRematch();
+        break;
+      case "surrender":
+        if (game.phase === "battle") { toast(state.oppName + " surrendered! ⚓"); endGame(true); }
+        break;
+      case "resync":
+        if (!net.isHost && msg.phase === "battle") {
+          state.myTurn = !msg.hostTurn;
+          if (game.phase === "battle") { show("#screen-battle"); renderBattle(); }
+        }
+        break;
+      case "bye":
+        state.peerLeft = true;
         break;
     }
   }
@@ -438,6 +524,8 @@
     state.myTurn = net.isHost ? (first === "host") : (first === "guest");
     state.sonarLeft = 1;
     state.sonarArmed = false;
+    state.streak = 0;
+    state.lastIncoming = null;
     enterBattle();
   }
 
@@ -447,30 +535,46 @@
     show("#screen-battle");
     updateNames();
     clearChat();
+    renderScoreboard();
     buildGrid($("#my-board"), false, null, null);
     buildGrid($("#enemy-board"), true, enemyClick, null);
     renderBattle();
     sfx.turn();
   }
 
+  function renderScoreboard() {
+    const el = $("#scoreboard");
+    if (!el) return;
+    if (state.wins || state.losses) {
+      el.textContent = "Series — You " + state.wins + " · " + state.losses + " " + state.oppName;
+      el.classList.remove("hidden");
+    } else {
+      el.classList.add("hidden");
+    }
+  }
+
   function renderBattle() {
     // My fleet board — show ships + incoming shots.
     const my = $("#my-board");
+    const li = state.lastIncoming;
     eachCell(my, (c, x, y) => {
       c.className = "cell";
-      const hasShip = game.board[y][x] !== null;
-      if (hasShip) c.classList.add("ship");
+      const id = game.board[y][x];
+      if (id !== null) c.classList.add("ship");
       const inc = game.incoming[y][x];
       if (inc === "hit") c.classList.add("hit");
       else if (inc === "miss") c.classList.add("miss");
+      if (id !== null && game.ship(id).hits >= game.ship(id).size) c.classList.add("sunk");
+      if (li && li.x === x && li.y === y) c.classList.add("last-shot");
     });
 
     // Enemy waters — only what I've discovered.
+    const sunkKeys = new Set(game.enemySunkCells.map(c => c.x + "," + c.y));
     const enemy = $("#enemy-board");
     eachCell(enemy, (c, x, y) => {
       c.className = "cell";
       const t = game.tracking[y][x];
-      if (t === "hit") c.classList.add("hit");
+      if (t === "hit") { c.classList.add("hit"); if (sunkKeys.has(x + "," + y)) c.classList.add("sunk"); }
       else if (t === "miss") c.classList.add("miss");
       else {
         const s = game.scan[y][x];
@@ -593,13 +697,20 @@
   // The enemy reported the result of MY shot.
   function handleResult(msg) {
     state.pending = false;
-    game.recordResult(msg.x, msg.y, msg.result, msg.sunk);
+    game.recordResult(msg.x, msg.y, msg.result, msg.sunk, msg.sunkCells);
     if (msg.result === "hit") {
       sfx.hit();
-      if (msg.sunk) { sfx.sunk(); toast("💥 You sank " + state.oppName + "'s " + msg.sunk + "! Fire again!"); }
-      else { toast("🎯 Direct hit — fire again!"); }
+      state.streak++;
+      if (msg.sunk) {
+        sfx.sunk();
+        toast("💥 You sank " + state.oppName + "'s " + msg.sunk + "! Fire again!");
+        sinkCells($("#enemy-board"), msg.sunkCells);
+      } else {
+        toast(state.streak >= 2 ? "🔥 " + state.streak + " hits in a row — fire again!" : "🎯 Direct hit — fire again!");
+      }
     } else {
       sfx.miss();
+      state.streak = 0;
     }
     if (msg.defeated) { renderBattle(); endGame(true); return; }
     // Classic rule: a hit earns another shot; only a miss ends your turn.
@@ -607,22 +718,37 @@
     renderBattle();
   }
 
+  // Play a one-shot sinking animation over a ship's cells on the given board.
+  function sinkCells(boardEl, cells) {
+    if (!boardEl || !cells) return;
+    cells.forEach(c => {
+      const el = boardEl.querySelector('.cell[data-x="' + c.x + '"][data-y="' + c.y + '"]');
+      if (!el) return;
+      el.classList.add("sinking");
+      setTimeout(() => el.classList.remove("sinking"), 900);
+    });
+  }
+
   // The opponent fired at ME.
   function handleIncomingFire(x, y) {
     const r = game.receiveFire(x, y);
-    net.send({ type: "result", x, y, result: r.result, sunk: r.sunk, defeated: r.defeated });
+    net.send({ type: "result", x, y, result: r.result, sunk: r.sunk, sunkCells: r.sunkCells, defeated: r.defeated });
+    state.lastIncoming = { x, y };
     if (r.result === "hit") { sfx.hit(); if (r.sunk) sfx.sunk(); }
     else sfx.miss();
-    if (r.defeated) { renderBattle(); endGame(false); return; }
+    if (r.defeated) { renderBattle(); if (r.sunk) sinkCells($("#my-board"), r.sunkCells); endGame(false); return; }
     // The shooter keeps firing after a hit — I only get the turn back on a miss.
     state.myTurn = r.result === "miss";
     if (state.myTurn) sfx.turn();
     renderBattle();
+    if (r.sunk) sinkCells($("#my-board"), r.sunkCells);
   }
 
   // ---------- Game over ----------
   function endGame(won) {
     game.phase = "over";
+    if (won) state.wins++; else state.losses++;
+    state.sonarArmed = false;
     show("#screen-over");
     const title = $("#over-title");
     title.textContent = won ? "⚓ Victory!" : "💀 Defeated";
@@ -630,6 +756,8 @@
     $("#over-text").textContent = won
       ? "You sent " + state.oppName + "'s fleet to the depths. Glorious."
       : state.oppName + " sank your whole fleet. Regroup and try again!";
+    const series = $("#over-series");
+    if (series) series.textContent = "Series — You " + state.wins + " · " + state.losses + " " + state.oppName;
     renderStats();
     $("#rematch-status").textContent = "";
     $("#rematch-btn").textContent = "Rematch";
@@ -655,6 +783,16 @@
   function setupBattle() {
     const s = $("#sonar-btn");
     if (s) s.addEventListener("click", toggleSonar);
+    const sr = $("#surrender-btn");
+    if (sr) sr.addEventListener("click", surrender);
+  }
+
+  function surrender() {
+    if (game.phase !== "battle") return;
+    if (!window.confirm("Surrender this battle?")) return;
+    net.send({ type: "surrender" });
+    toast("You struck your colours. 🏳️");
+    endGame(false);
   }
 
   function maybeRematch() {

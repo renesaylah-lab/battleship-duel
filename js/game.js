@@ -29,6 +29,7 @@
         id: i, name: s.name, size: s.size, horizontal: true, cells: [], hits: 0, placed: false,
       }));
       this.enemySunk = [];           // names of enemy ships I have sunk
+      this.enemySunkCells = [];      // {x,y} of enemy ship cells I've confirmed sunk
       this.phase = "placement";      // 'placement' | 'battle' | 'over'
     }
 
@@ -103,7 +104,7 @@
     // The opponent fired at (x, y) on MY board. Returns the outcome to report back.
     receiveFire(x, y) {
       const id = this.board[y][x];
-      let result, sunk = null;
+      let result, sunk = null, sunkCells = null;
       if (id === null) {
         this.incoming[y][x] = "miss";
         result = "miss";
@@ -112,16 +113,22 @@
         result = "hit";
         const sh = this.ship(id);
         sh.hits++;
-        if (sh.hits >= sh.size) sunk = sh.name;
+        if (sh.hits >= sh.size) { sunk = sh.name; sunkCells = sh.cells.map(c => ({ x: c.x, y: c.y })); }
       }
       const defeated = this.ships.every(s => s.hits >= s.size);
-      return { x, y, result, sunk, defeated };
+      return { x, y, result, sunk, sunkCells, defeated };
     }
 
     // The enemy reported the outcome of MY shot at (x, y).
-    recordResult(x, y, result, sunk) {
+    recordResult(x, y, result, sunk, sunkCells) {
       this.tracking[y][x] = result;
-      if (sunk) this.enemySunk.push(sunk);
+      if (sunk) {
+        this.enemySunk.push(sunk);
+        if (sunkCells) sunkCells.forEach(c => {
+          this.tracking[c.y][c.x] = "hit";
+          this.enemySunkCells.push({ x: c.x, y: c.y });
+        });
+      }
     }
 
     // The opponent swept (x, y) with sonar. Report which of the surrounding
